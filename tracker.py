@@ -6,7 +6,11 @@ def main():
     # Field names for csv file
     field_names = ["Window", "Time"] 
     # File path
-    file_path = "./data/raw/data.csv"
+    file_path = "./data/raw/data_day1.csv"
+
+    # Open file to append
+    with open(file_path, "a", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=field_names)
     
     try: 
         print("Tracker started... logging data to data.csv")
@@ -16,17 +20,13 @@ def main():
             active_window = gw.getActiveWindow()
             # Getting the time of capture
             current_time = t.ctime()
-            
-            # Open file to append
-            with open(file_path, "a", newline="", encoding="utf-8") as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=field_names)
-                # Get the title for each window
-                title_window = active_window.title  # type: ignore
-                # If the title exists it is printed
-                if title_window.strip():
-                    print(f"Active window: {title_window}, at time: {current_time}")
-                    # Log to file
-                    writer.writerow({"Window" : title_window, "Time" : current_time})
+            # Get the title for each window
+            title_window = active_window.title
+            # If the title exists it is printed
+            if title_window.strip():
+                print(f"Active window: {title_window}, at time: {current_time}")
+                # Log to file
+                writer.writerow({"Window" : title_window, "Time" : current_time})
             # Pause for 5 seconds
             t.sleep(5)
     except KeyboardInterrupt:
