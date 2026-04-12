@@ -34,25 +34,48 @@ def main(day_number):
 def classify_activity(title):
     title = title.lower()
     
-    # Priority Keywords
-    study = ["caie", "past papers", "papacambridge", ".pdf"]
-    coding = ["visual studio code", ".py", "github"]
-    social = ["instagram", "discord", "whatsapp"]
-    ai = ["google gemini", "chatgpt", "claude"]
+    study = [
+        "caie", "past papers", "papacambridge", ".pdf", 
+        "9702", "9990", "physics", "psychology", "mechanics", 
+        "pure mathematics", "syllabus", "cambridge international"
+    ]
     
-    # 3. FIX: Refined Media Logic (The Dash Bug)
-    # Only flag as media if it HAS a dash but NOT VS Code or Chrome system tabs
-    is_media_candidate = " - " in title
+    coding = ["visual studio code", ".py", "github", "tracker.py", "focus-guard"]
+
+    social = ["instagram", "discord", "whatsapp", "reddit", "facebook"]
+    
+    ai = ["google gemini", "chatgpt", "claude"]
+
+    media = ["youtube", "spotify", "music", "footybite"]
+
+    # --- Refined Logic ---
+    
+    # Check for Study first (High Priority)
+    if any(w in title for w in study): 
+        return 1, 0, 0, 0, 0
+    
+    # Check for Coding
+    if any(w in title for w in coding): 
+        return 0, 1, 0, 0, 0
+    
+    # Check for Social
+    if any(w in title for w in social): 
+        return 0, 0, 1, 0, 0
+    
+    # Check for AI
+    if any(w in title for w in ai):     
+        return 0, 0, 0, 1, 0
+
+    # Improved Media detection: 
+    # Use keywords or the "Dash Bug" logic, but ensure it's not a work app
+    is_media_candidate = (" - " in title) or any(w in title for w in media)
     is_work_app = "visual studio code" in title or "google chrome" in title
     
-    # Waterfall Classification
-    if any(w in title for w in study): return 1, 0, 0, 0, 0
-    if any(w in title for w in coding): return 0, 1, 0, 0, 0
-    if any(w in title for w in social): return 0, 0, 1, 0, 0
-    if any(w in title for w in ai):     return 0, 0, 0, 1, 0
-    if is_media_candidate and not is_work_app: return 0, 0, 0, 0, 1
+    # If it's a media keyword OR has a dash but isn't a browser/IDE system title
+    if is_media_candidate and not (is_work_app and not any(w in title for w in media)):
+        return 0, 0, 0, 0, 1
     
-    return 0, 0, 0, 0, 0 # Default (Browsing/System)
+    return 0, 0, 0, 0, 0 # Default (Browsing/System/Task Switching)
 
 def process_and_save(output_path, window, duration, hour):
     field_names = ["is_study", "is_coding", "is_social", "is_ai", "is_media", "duration", "hour", "label"]
@@ -84,4 +107,4 @@ def process_and_save(output_path, window, duration, hour):
         })
 
 if __name__ == "__main__":
-    main(day_number=0)
+    main(day_number=1)

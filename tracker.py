@@ -22,7 +22,7 @@ def main(day_number):
         try: 
             print(f"Tracker started... logging to {file_path.name}")
             while True:
-                t.sleep(5)
+                t.sleep(1)
                 
                 check_obj = gw.getActiveWindow()
                 new_window_title = check_obj.title if check_obj else "Desktop/None"
@@ -57,4 +57,4 @@ def main(day_number):
             print("\nTracker Stopped.")
 
 if __name__ == "__main__":
-    main(day_number=0)
+    main(day_number=1)
