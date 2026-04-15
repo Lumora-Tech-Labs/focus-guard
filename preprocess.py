@@ -1,109 +1,141 @@
 import csv
 from pathlib import Path
+from datetime import datetime
 
 def main(day_number):
     input_path = Path(f"./data/raw/data_day{day_number + 1}.csv")
-    output_path = Path(f"./data/processed/cleaned_day{day_number + 1}.csv")
-    
-    # 1. FIX: Overwrite the file on start so we don't duplicate data
+    output_path = Path(f"./data/processed/cleaned_day{day_number + 1.1}.csv")
+
+    # Clear old file
     if output_path.exists():
-        output_path.unlink() 
+        output_path.unlink()
 
     try:
         with open(input_path, "r", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
-            
-            # Process row-by-row directly (Efficient)
+
             for row in reader:
-                # 2. FIX: Convert duration to float immediately
+                window = row.get("Window", "").strip()
+
+                # --- duration fix ---
                 try:
-                    duration_val = float(row["Duration"])
+                    duration = float(row.get("Duration", 0))
                 except ValueError:
-                    duration_val = 0.0
-                
-                # Extract hour
-                hour_val = int(row["Start time"][11:13])
-                
-                process_and_save(output_path, row["Window"], duration_val, hour_val)
-                
-        print(f"✅ Processed Day {day_number + 1} into {output_path}")
-            
+                    duration = 0.0
+
+                # --- hour fix (safe parsing) ---
+                try:
+                    hour = datetime.strptime(
+                        row.get("Start time", ""),
+                        "%Y-%m-%d %H:%M:%S"
+                    ).hour
+                except Exception:
+                    hour = 0
+
+                # DEBUG (uncomment if needed)
+                # print(window, duration, hour)
+
+                process_and_save(output_path, window, duration, hour)
+
+        print(f"✅ Processed Day {day_number + 1} → {output_path}")
+
     except FileNotFoundError:
-        print(f"❌ Input file {input_path} not found.")
+        print(f"❌ Input file not found: {input_path}")
 
 def classify_activity(title):
     title = title.lower()
-    
-    study = [
-        "caie", "past papers", "papacambridge", ".pdf", 
-        "9702", "9990", "physics", "psychology", "mechanics", 
-        "pure mathematics", "syllabus", "cambridge international"
+
+    study_keywords = [
+        "physics", "mathematics", "math", "caie", "9702",
+        "past paper", "pdf", "syllabus", "economics",
+        "further maths", "mechanics"
     ]
-    
-    coding = ["visual studio code", ".py", "github", "tracker.py", "focus-guard"]
 
-    social = ["instagram", "discord", "whatsapp", "reddit", "facebook"]
-    
-    ai = ["google gemini", "chatgpt", "claude"]
+    coding_keywords = [
+        "visual studio code", "vscode", ".py", "github",
+        "code", "tracker", "focus-guard"
+    ]
 
-    media = ["youtube", "spotify", "music", "footybite"]
+    social_keywords = [
+        "instagram", "discord", "whatsapp", "reddit",
+        "facebook", "twitter"
+    ]
 
-    # --- Refined Logic ---
-    
-    # Check for Study first (High Priority)
-    if any(w in title for w in study): 
+    ai_keywords = [
+        "chatgpt", "gemini", "claude"
+    ]
+
+    media_keywords = [
+        "youtube", "spotify", "netflix", "music"
+    ]
+
+    if any(k in title for k in study_keywords):
         return 1, 0, 0, 0, 0
-    
-    # Check for Coding
-    if any(w in title for w in coding): 
+
+    if any(k in title for k in coding_keywords):
         return 0, 1, 0, 0, 0
-    
-    # Check for Social
-    if any(w in title for w in social): 
+
+    if any(k in title for k in social_keywords):
         return 0, 0, 1, 0, 0
-    
-    # Check for AI
-    if any(w in title for w in ai):     
+
+    if any(k in title for k in ai_keywords):
         return 0, 0, 0, 1, 0
 
-    # Improved Media detection: 
-    # Use keywords or the "Dash Bug" logic, but ensure it's not a work app
-    is_media_candidate = (" - " in title) or any(w in title for w in media)
-    is_work_app = "visual studio code" in title or "google chrome" in title
-    
-    # If it's a media keyword OR has a dash but isn't a browser/IDE system title
-    if is_media_candidate and not (is_work_app and not any(w in title for w in media)):
+    if any(k in title for k in media_keywords):
         return 0, 0, 0, 0, 1
-    
-    return 0, 0, 0, 0, 0 # Default (Browsing/System/Task Switching)
+
+    return 0, 0, 0, 0, 0
 
 def process_and_save(output_path, window, duration, hour):
-    field_names = ["is_study", "is_coding", "is_social", "is_ai", "is_media", "duration", "hour", "label"]
-    
-    # Get features
-    res = classify_activity(window)
-    is_study, is_coding, is_social, is_ai, is_media = res
-    
-    # 4. FIX: Smarter Labeling
-    # We only label as 'Focused' if it's study/coding/ai AND duration isn't tiny
-    is_productive_type = (is_study or is_coding or is_ai)
-    is_long_enough = duration > 10.0 # Ignore micro-switches
-    label = 1 if (is_productive_type and is_long_enough) else 0
+    field_names = [
+        "is_study", "is_coding", "is_social",
+        "is_ai", "is_media",
+        "duration_bucket", "hour_sin", "hour_cos",
+        "label"
+    ]
 
-    # Save logic
+    is_study, is_coding, is_social, is_ai, is_media = classify_activity(window)
+    
+    if duration < 1:
+        duration_bucket = 0
+    elif duration < 5:
+        duration_bucket = 1
+    elif duration < 15:
+        duration_bucket = 2
+    else:
+        duration_bucket = 3
+
+    is_productive = (is_study or is_coding or is_ai)
+
+    # lowered threshold (was 10.0 → too strict)
+    is_long_enough = duration >= 2.0
+
+    label = 1 if (is_productive and is_long_enough) else 0
+
+    import math
+
+    hour_rad = (hour / 24) * 2 * math.pi
+    hour_sin = math.sin(hour_rad)
+    hour_cos = math.cos(hour_rad)
+
     file_exists = output_path.exists()
+
     with open(output_path, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=field_names)
+
         if not file_exists:
             writer.writeheader()
+
         writer.writerow({
             "is_study": is_study,
             "is_coding": is_coding,
             "is_social": is_social,
             "is_ai": is_ai,
             "is_media": is_media,
-            "duration": duration, 
-            "hour": hour, "label": label
+            "duration_bucket": duration_bucket,
+            "hour_sin": hour_sin,
+            "hour_cos": hour_cos,
+            "label": label
         })
 
 if __name__ == "__main__":
